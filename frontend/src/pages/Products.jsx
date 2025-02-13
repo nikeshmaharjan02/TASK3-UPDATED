@@ -4,10 +4,8 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Link, useNavigate } from 'react-router-dom';
 
-
-const Home = () => {
-    const { backendUrl, setUserData, user } = useContext(AppContext);
-
+const Products = () => {
+    const { cart, setCart, backendUrl } = useContext(AppContext);
     const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [totalPages, setTotalPages] = useState(0);
@@ -17,6 +15,9 @@ const Home = () => {
     const [maxPrice, setMaxPrice] = useState('');
     const [sort, setSort] = useState('newest');
     const [category, setCategory] = useState('');
+    
+    // State for quantity of each product
+    const [quantities, setQuantities] = useState({});
 
     const fetchProducts = async () => {
         try {
@@ -37,50 +38,63 @@ const Home = () => {
         fetchProducts();
     }, [page, limit, minPrice, maxPrice, sort, category]);
 
-    const handleAddToCart = (product) => {
-        if (!user) {
-            navigate('/login');
-        } else {
-            // Add product to cart logic (example API call)
-            toast.success(`${product.name} added to cart!`);
+    // Update quantity for each product
+    const handleQuantityChange = (productId, value) => {
+        if (value < 1) return; // Prevent zero or negative values
+        setQuantities((prev) => ({ ...prev, [productId]: value }));
+    };
+
+    const handleAddToCart = async (product) => {
+        const quantity = quantities[product._id] || 1; 
+
+        try {
+            const response = await axios.post(
+                `${backendUrl}/api/cart/add-to-cart`,
+                { productId: product._id, quantity },
+                { withCredentials: true }
+            );
+            
+            if (response.data.success) {
+                setCart(response.data.cart.items);
+                toast.success(`${product.name} added to cart!`);
+            } else {
+                toast.error(response.data.message || 'Failed to add to cart');
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Something went wrong! Please try again.');
         }
     };
 
     return (
         <div className="container mx-auto p-6">
             <h1 className="text-4xl font-bold text-center mb-8">Shop Our Collection</h1>
-            <div className="mb-6 flex flex-wrap justify-between bg-gray-100 p-4 rounded-lg shadow">
-                <div className="flex items-center space-x-4">
-                    <input type="number" name="minPrice" placeholder="Min Price" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300" />
-                    <input type="number" name="maxPrice" placeholder="Max Price" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300" />
-                </div>
-                <div className="flex items-center space-x-4">
-                    <select name="sort" value={sort} onChange={(e) => setSort(e.target.value)} className="px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300">
-                        <option value="newest">Newest</option>
-                        <option value="oldest">Oldest</option>
-                        <option value="views">Views</option>
-                        <option value="popularity">Popularity</option>
-                        <option value="reviews">Reviews</option>
-                    </select>
-                    <select name="category" value={category} onChange={(e) => setCategory(e.target.value)} className="px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300">
-                        <option value="">All Categories</option>
-                        <option value="electronics">Electronics</option>
-                        <option value="clothing">Clothing</option>
-                        <option value="jewellery">Jewellery</option>
-                    </select>
-                </div>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {products.map((product) => (
-                    <div key={product._id} className="bg-white p-5 rounded-lg shadow-lg transform transition-transform hover:scale-105">
+                    <div key={product._id} className="bg-white p-5 rounded-lg shadow-lg transform transition-transform hover:scale-105 flex flex-col h-full">
                         <img src={product.image} alt={product.name} className="w-full h-48 object-cover rounded-lg mb-4" />
-                        <h2 className="text-xl font-semibold text-gray-800">{product.name}</h2>
-                        <p className="text-gray-600 mb-4">{product.description.substring(0, 50)}...</p>
+                        <h2 className="text-xl font-semibold text-gray-800 line-clamp-2">{product.name}</h2>
+                        <p className="text-gray-600 flex-grow">{product.description.substring(0, 50)}...</p>
                         <div className="flex justify-between items-center">
                             <span className="text-lg font-bold text-blue-600">${product.price}</span>
-                            <button onClick={() => handleAddToCart(product)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700">Add to Cart</button>
                         </div>
+                        <div className="flex items-center mt-4">
+                            <label className="mr-2 font-semibold">Quantity:</label>
+                            <input
+                                type="number"
+                                value={quantities[product._id] || 1}
+                                min="1"
+                                onChange={(e) => handleQuantityChange(product._id, Number(e.target.value))}
+                                className="w-16 px-2 py-1 border rounded-lg text-center"
+                            />
+                        </div>
+                        <button
+                            onClick={() => handleAddToCart(product)}
+                            className="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            Add to Cart
+                        </button>
                     </div>
+
                 ))}
             </div>
             <div className="flex justify-center mt-6">
@@ -95,4 +109,4 @@ const Home = () => {
     );
 };
 
-export default Home;
+export default Products;

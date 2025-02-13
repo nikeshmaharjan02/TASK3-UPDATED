@@ -33,7 +33,7 @@ const registerUser = async (req, res) => {
             return res.json({ success: false, message: "Email already registered" });
         }
 
-        // hashing doctor password
+        // hashing user password
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
 
@@ -92,7 +92,10 @@ const checkSession = (req, res) => {
 }
 // **Logout User**
 const logoutUser = (req, res) => {
-    const userId = req.session.user?.id;  // Accessing userId from session
+    if (!req.session.user && !req.user) {
+        return res.status(400).json({ success: false, message: "User not logged in" });
+    }
+    const userId = req.session.user?.id || req.user?.id;  // Accessing userId from session
     
     if (!userId) {
         return res.status(400).json({ success: false, message: "User not logged in" });
@@ -101,7 +104,9 @@ const logoutUser = (req, res) => {
     req.session.destroy(err => {
         if (err) return res.status(500).json({ success: false, message: "Logout failed" });
         res.clearCookie("connect.sid");
-        res.status(200).json({ success: true, message: "Logged out successfully" });
+        req.logout(() => {
+            res.status(200).json({ success: true, message: "Logged out successfully" });
+        });
     });
 };
 

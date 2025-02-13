@@ -3,22 +3,26 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { AppContext } from '../context/AppContext';
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
-    const { backendUrl, setUserData } = useContext(AppContext);  // Using setUserData instead of setToken
+    const { backendUrl, setUserData, checkSession } = useContext(AppContext);  // Using setUserData instead of setToken
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const navigate = useNavigate();
 
+    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post("http://localhost:4000/api/auth/login", { email, password }, { withCredentials: true });
+            const response = await axios.post(`${backendUrl}/api/auth/login`, { email, password }, { withCredentials: true });
+
 
             if (response.data.success) {
                 toast.success(response.data.message || "Login Successful");
                 // Set user data from session response (directly from the backend response)
                 setUserData(response.data.user);  // This now stores user info in the context
+                checkSession();
                 navigate("/homeScreen");
             } else {
                 toast.error(response.data.message || "Login Failed");
@@ -31,6 +35,11 @@ const Login = () => {
                 "Something went wrong! Please try again!"
             );
         }
+    };
+
+    // Handle Google login redirect
+    const handleGoogleLogin = () => {
+        window.location.href = "http://localhost:4000/api/auth/google"; 
     };
 
     return (
@@ -67,6 +76,17 @@ const Login = () => {
                         Login
                     </button>
                 </form>
+
+                {/* Google Login Button */}
+                <div className="mt-6">
+                    <button
+                        onClick={handleGoogleLogin}
+                        className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                    >
+                        Login with Google
+                    </button>
+                </div>
+
                 <p className="text-center mt-4">
                     <Link
                         to="/forgot-password"

@@ -8,7 +8,11 @@ const connectCloudinary = require('./config/cloudinary.js');
 const authRouter = require('./routes/authRoutes.js');
 const userRouter = require('./routes/userRoute.js');
 const adminRouter = require('./routes/adminRoute.js')
-
+const productRouter = require('./routes/productRoute.js')
+const cartRouter = require('./routes/cartRoute.js');
+const googleAuthRouter = require('./routes/googleAuthRoute.js');
+const passport = require("passport");
+require("./config/googlePassport.js");
 
 //app config
 const app = express()
@@ -39,11 +43,17 @@ app.use(session({
     cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
 
-// api endpoints
-app.use('/api/auth',authRouter)
-app.use('/api/user',userRouter)
-app.use('/api/admin', adminRouter)
+// Passport middleware (must be before routes that need authentication)
+app.use(passport.initialize());
+app.use(passport.session());
 
+// api endpoints
+app.use('/api/auth',authRouter);
+app.use('/api/user',userRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/auth', googleAuthRouter);
+app.use('/api/product',productRouter);
+app.use('/api/cart',cartRouter);
 
 
 app.get('/',(req,res)=>{
