@@ -15,6 +15,9 @@ const productSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+
+productSchema.index({ name: "text", description: "text", category: "text" });
+
 const productModel = mongoose.models.product || mongoose.model("product", productSchema);
 
 module.exports = productModel;

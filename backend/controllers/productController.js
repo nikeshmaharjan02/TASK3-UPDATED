@@ -2,50 +2,58 @@ const productModel = require("../models/productModel");
 const logger = require("../utils/logger");
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
+const redisClient = require('../utils/redisClient');
 
-
-// @desc   Fetch products with filtering, sorting, and pagination
-// @route  GET /api/products/get-products
-// @access Public
 const getProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 10, min_price, max_price, sort, category } = req.query;
+        const { page = 1, limit = 10, min_price, max_price, sort, category, search } = req.query;
 
-        let filter = {}; // Define filter object
+        let filter = {}; 
 
-        // Apply price filtering
         if (min_price || max_price) {
             filter.price = {};
             if (min_price) filter.price.$gte = parseFloat(min_price);
             if (max_price) filter.price.$lte = parseFloat(max_price);
         }
 
-        // Apply category filter
         if (category) {
             filter.category = category;
         }
 
-        // Sorting (default is newest first)
+        if (search) {
+            filter.$text = { $search: search };
+        }
+
         let sortOption = { createdAt: -1 };
         if (sort === "oldest") sortOption = { createdAt: 1 };
         if (sort === "views") sortOption = { views: -1 };
         if (sort === "popularity") sortOption = { popularity: -1 };
         if (sort === "reviews") sortOption = { reviews: -1 };
 
-        // Pagination calculations
+        if (search) {
+            sortOption = { score: { $meta: "textScore" }, ...sortOption };
+        }
+
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        // Fetch products with filters, sorting, and pagination
-        const products = await productModel.find(filter)
+        const cacheKey = `products:page=${page}&limit=${limit}&min_price=${min_price || ''}&max_price=${max_price || ''}&sort=${sort || ''}&category=${category || ''}&search=${search || ''}`;
+
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+            logger.info('Cache hit for products');
+            return res.json({ source: 'cache', ...JSON.parse(cachedData) });
+        } else {
+            logger.info('Cache miss, fetching from database');
+        }
+
+        const products = await productModel.find(filter, search ? { score: { $meta: "textScore" } } : {})
             .sort(sortOption)
             .skip(skip)
             .limit(parseInt(limit));
 
-        // Get total count for pagination metadata
         const total = await productModel.countDocuments(filter);
 
-        // Respond with success and data
-        res.status(200).json({
+        const responseData = {
             success: true,
             message: "Products fetched successfully",
             total,
@@ -53,7 +61,13 @@ const getProducts = async (req, res) => {
             limit: parseInt(limit),
             totalPages: Math.ceil(total / limit),
             data: products,
+        };
+
+        await redisClient.set(cacheKey, JSON.stringify(responseData), {
+            EX: 600 
         });
+
+        res.status(200).json(responseData);
     } catch (error) {
         logger.error(`Error fetching products: ${error.message}`);
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -63,9 +77,8 @@ const getProducts = async (req, res) => {
 const addProduct = async (req, res) => {
     try {
         const { name, description, price, category } = req.body;
-        const imageFile = req.file;  
+        const imageFile = req.file;
 
-        // Validate required fields
         if (!name || !price || !category) {
             return res.status(400).json({
                 success: false,
@@ -73,15 +86,21 @@ const addProduct = async (req, res) => {
             });
         }
 
-        let imageUrl;
+        let imageUrl = "";
 
         if (imageFile) {
-            const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" });
-
-            imageUrl = imageUpload.secure_url;
-
-            // Remove uploaded file from local storage (after Cloudinary upload)
-            fs.unlinkSync(imageFile.path);
+            try {
+                const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" });
+                imageUrl = imageUpload.secure_url;
+                fs.unlinkSync(imageFile.path);
+            } catch (uploadError) {
+                logger.error(`Image upload failed: ${uploadError.message}`);
+                return res.status(500).json({
+                    success: false,
+                    message: "Image upload failed",
+                    error: uploadError.message,
+                });
+            }
         }
 
         const newProduct = new productModel({
@@ -89,11 +108,13 @@ const addProduct = async (req, res) => {
             description,
             price,
             category,
-            image: imageUrl,  
+            image: imageUrl,
         });
 
         await newProduct.save();
 
+        const cacheKeyPattern = `products:page=*&limit=*&min_price=&max_price=&sort=&category=${category || ''}`;
+        await redisClient.del(cacheKeyPattern);
 
         logger.info(`New product added: ${name} (ID: ${newProduct._id})`);
 
@@ -102,16 +123,15 @@ const addProduct = async (req, res) => {
             message: "Product added successfully!",
             product: newProduct,
         });
+
     } catch (error) {
         logger.error(`Error adding product: ${error.message}`);
-
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: "Server Error",
             error: error.message,
         });
     }
 };
-
 
 module.exports = { getProducts, addProduct };
