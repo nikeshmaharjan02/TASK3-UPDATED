@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "server": "nodemon server.js"
+    "server": "nodemon server.js",
+    "generateDoc": "node config/swaggerConfig.js"
   },
   "author": "",
   "license": "ISC",
@@ -26,7 +27,12 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "redis": "^4.7.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "validator": "^13.12.0",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "swagger-autogen": "^2.23.7"
   }
 }

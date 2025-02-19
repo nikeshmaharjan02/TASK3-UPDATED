@@ -4,16 +4,16 @@ const { loginWithGoogle, logoutUser } = require('../controllers/googleAuthContro
 
 const googleAuthRouter = express.Router();
 
-// Google OAuth login route
-googleAuthRouter.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-// Google OAuth callback route
-googleAuthRouter.get('/google/callback',
+googleAuthRouter.get('/', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+
+googleAuthRouter.get('/callback',
     passport.authenticate('google', { failureRedirect: '/' }),
     loginWithGoogle
 );
 
-// Google Logout Route (Using common logout function)
-googleAuthRouter.post('/logout', logoutUser);  // ✅ Use logoutUser (not logoutGoogleUser)
+
+// googleAuthRouter.post('/logout', logoutUser);  
 
 module.exports = googleAuthRouter;

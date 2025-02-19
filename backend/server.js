@@ -13,6 +13,8 @@ const cartRouter = require('./routes/cartRoute.js');
 const googleAuthRouter = require('./routes/googleAuthRoute.js');
 const passport = require("passport");
 require("./config/googlePassport.js");
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./config/swagger.json");
 
 //app config
 const app = express()
@@ -51,9 +53,12 @@ app.use(passport.session());
 app.use('/api/auth',authRouter);
 app.use('/api/user',userRouter);
 app.use('/api/admin', adminRouter);
-app.use('/api/auth', googleAuthRouter);
+app.use('/api/auth/google', googleAuthRouter);
 app.use('/api/product',productRouter);
 app.use('/api/cart',cartRouter);
+
+// Serve Swagger UI at /api-docs
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 
 app.get('/',(req,res)=>{
