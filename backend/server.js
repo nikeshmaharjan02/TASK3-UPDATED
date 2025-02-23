@@ -11,10 +11,12 @@ const adminRouter = require('./routes/adminRoute.js')
 const productRouter = require('./routes/productRoute.js')
 const cartRouter = require('./routes/cartRoute.js');
 const googleAuthRouter = require('./routes/googleAuthRoute.js');
+const orderRouter = require('./routes/orderRoute.js');
 const passport = require("passport");
 require("./config/googlePassport.js");
 const swaggerUi = require("swagger-ui-express");
 const swaggerDocument = require("./config/swagger.json");
+const rateLimit = require('express-rate-limit');
 
 //app config
 const app = express()
@@ -22,17 +24,24 @@ const port = process.env.PORT || 4000
 connectDB()
 connectCloudinary()
 
+// Set up rate limit
+const limiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 60, // limit each IP to 60 requests per windowMs
+    message: "Too many requests from this IP, please try again after a minute",
+    headers: true, 
+});
+
 // middlewares
 app.use(express.json());
 app.use(cors({
     origin: [
-        "http://localhost:5173", // First allowed frontend URL
-        "http://localhost:5174", // Second allowed frontend URL
+        "http://localhost:5173", 
+        "http://localhost:5174", 
     ],
     credentials: true,
 }));
-
-// Session Middleware (Stores sessions in MongoDB)
+app.use(limiter);
 app.use(session({
     secret: process.env.SESSION_SECRET,  
     resave: false,
@@ -41,7 +50,7 @@ app.use(session({
         mongoUrl: process.env.MONGODB_URI,
         dbName: "task3",
         collectionName: "sessions",
-    }),  // Store sessions in MongoDB
+    }),  
     cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
 
@@ -56,6 +65,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/auth/google', googleAuthRouter);
 app.use('/api/product',productRouter);
 app.use('/api/cart',cartRouter);
+app.use('/api/order',orderRouter);
 
 // Serve Swagger UI at /api-docs
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));

@@ -38,6 +38,7 @@ const Header = () => {
                             <>
                                 <li><a href="/homeScreen" className="text-gray-700 hover:text-blue-500 transition">Home</a></li>
                                 <li><a href="/products" className="text-gray-700 hover:text-blue-500 transition">Products</a></li>
+                                <li><a href="/orders" className="text-gray-700 hover:text-blue-500 transition">Orders</a></li>
                                 <li className="relative cursor-pointer" onClick={() => navigate('/cart')}>
                                     <FaShoppingCart className="text-gray-700 text-2xl" />
                                     {cartItems > 0 && (

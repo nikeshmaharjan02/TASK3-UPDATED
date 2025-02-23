@@ -4,6 +4,9 @@ import Header from './components/Header';
 import { ToastContainer } from 'react-toastify';
 import "react-toastify/dist/ReactToastify.css";
 import { AppContext } from './context/AppContext';
+import ProductDetail from './pages/ProductDetail';
+import CheckoutSuccess from './pages/CheckoutSuccess';
+import Orders from './pages/Orders';
 
 // Lazy Loading Pages
 const Home = lazy(() => import('./pages/Home'));
@@ -34,6 +37,9 @@ const App = () => {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/google-login-success" element={<GoogleLoginSuccess />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/checkout-success" element={<CheckoutSuccess />} />
+          <Route path="/orders" element={<Orders />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

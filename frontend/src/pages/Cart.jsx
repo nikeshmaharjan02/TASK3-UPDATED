@@ -1,12 +1,37 @@
 import axios from "axios";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../context/AppContext";
+import { useNavigate } from "react-router-dom";
 
 const Cart = () => {
     const { cart, setCart, backendUrl } = useContext(AppContext);
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true); // Added loading state
+
+    // Fetch cart data when component mounts
+    useEffect(() => {
+        const fetchCart = async () => {
+            try {
+                const response = await axios.get(`${backendUrl}/api/cart`, { withCredentials: true });
+
+                if (response.data.success) {
+                    setCart(response.data.cart?.items || []);
+                } else {
+                    console.error("Failed to fetch cart:", response.data.message);
+                }
+            } catch (error) {
+                console.error("Error fetching cart data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCart(); // Always fetch cart data on mount
+    }, [backendUrl, setCart]); // Removed cart.length dependency
 
     // Remove item from cart
     const handleRemove = async (productId) => {
+        if (!productId) return;
         try {
             const response = await axios.delete(`${backendUrl}/api/cart/remove-from-cart`, {
                 data: { productId },
@@ -14,7 +39,7 @@ const Cart = () => {
             });
 
             if (response.data.success) {
-                setCart(response.data.cart.items);
+                setCart(response.data.cart?.items || []);
             } else {
                 console.error("Failed to remove item:", response.data.message);
             }
@@ -25,7 +50,7 @@ const Cart = () => {
 
     // Update item quantity
     const handleUpdateQuantity = async (productId, newQuantity) => {
-        if (newQuantity < 1) {
+        if (!productId || newQuantity < 1) {
             handleRemove(productId);
             return;
         }
@@ -37,7 +62,7 @@ const Cart = () => {
             }, { withCredentials: true });
 
             if (response.data.success) {
-                setCart(response.data.cart.items);
+                setCart(response.data.cart?.items || []);
             } else {
                 console.error("Failed to update quantity:", response.data.message);
             }
@@ -48,8 +73,35 @@ const Cart = () => {
 
     // Calculate total price
     const getTotalPrice = () => {
-        return cart.reduce((total, item) => total + item.price * item.quantity, 0).toFixed(2);
+        return cart.reduce((total, item) => {
+            const price = item.price || item.productId?.price || 0;
+            return total + price * item.quantity;
+        }, 0).toFixed(2);
     };
+
+    // Proceed to checkout
+    const handleCheckout = async () => {
+        try {
+            const response = await axios.post(
+                `${backendUrl}/api/cart/checkout`,
+                { cart },
+                { withCredentials: true }
+            );
+
+            if (response.data.success) {
+                setCart([]);
+                navigate("/checkout-success");
+            } else {
+                console.error("Checkout failed:", response.data.message);
+            }
+        } catch (error) {
+            console.error("Error during checkout:", error);
+        }
+    };
+
+    if (loading) {
+        return <div className="text-center text-xl text-gray-600">Loading your cart...</div>;
+    }
 
     return (
         <div className="container mx-auto p-6">
@@ -62,48 +114,50 @@ const Cart = () => {
                 </div>
             ) : (
                 <div>
-                    {cart.map((item) => (
-                        <div
-                            key={item._id}
-                            className="flex justify-between items-center bg-white p-4 rounded-lg shadow-md mb-4"
-                        >
-                            <div className="flex items-center">
-                                <img
-                                    src={item.productId?.image || "https://via.placeholder.com/100"}
-                                    alt={item.productId?.name}
-                                    className="w-16 h-16 object-cover rounded-md mr-4"
-                                />
-                                <div>
-                                    <p className="text-xl font-semibold">{item.productId?.name}</p>
-                                    <p className="text-lg font-medium text-gray-700">
-                                        ${item.price.toFixed(2)}
-                                    </p>
-                                    <div className="flex items-center mt-2">
-                                        <button
-                                            onClick={() => handleUpdateQuantity(item.productId?._id, item.quantity - 1)}
-                                            className="px-3 py-1 bg-gray-300 text-black rounded-lg hover:bg-gray-400"
-                                        >
-                                            -
-                                        </button>
-                                        <span className="mx-3">{item.quantity}</span>
-                                        <button
-                                            onClick={() => handleUpdateQuantity(item.productId?._id, item.quantity + 1)}
-                                            className="px-3 py-1 bg-gray-300 text-black rounded-lg hover:bg-gray-400"
-                                        >
-                                            +
-                                        </button>
+                    {cart.map((item) => {
+                        const productId = item.productId?._id || item._id;
+                        const productName = item.productId?.name || "Loading...";
+                        const productImage = item.productId?.images?.[0] || "https://via.placeholder.com/100";
+                        const price = item.price || item.productId?.price || 0;
+
+                        return (
+                            <div key={productId} className="flex justify-between items-center bg-white p-4 rounded-lg shadow-md mb-4">
+                                <div className="flex items-center">
+                                    <img
+                                        src={productImage}
+                                        alt={productName}
+                                        className="w-16 h-16 object-cover rounded-md mr-4"
+                                    />
+                                    <div>
+                                        <p className="text-xl font-semibold">{productName}</p>
+                                        <p className="text-lg font-medium text-gray-700">${price.toFixed(2)}</p>
+                                        <div className="flex items-center mt-2">
+                                            <button
+                                                onClick={() => handleUpdateQuantity(productId, item.quantity - 1)}
+                                                className="px-3 py-1 bg-gray-300 text-black rounded-lg hover:bg-gray-400"
+                                            >
+                                                -
+                                            </button>
+                                            <span className="mx-3">{item.quantity}</span>
+                                            <button
+                                                onClick={() => handleUpdateQuantity(productId, item.quantity + 1)}
+                                                className="px-3 py-1 bg-gray-300 text-black rounded-lg hover:bg-gray-400"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
+                                <button
+                                    onClick={() => handleRemove(productId)}
+                                    className="text-red-500 hover:text-red-700 transition duration-200"
+                                    aria-label={`Remove ${productName} from cart`}
+                                >
+                                    Remove
+                                </button>
                             </div>
-                            <button
-                                onClick={() => handleRemove(item.productId?._id)}
-                                className="text-red-500 hover:text-red-700 transition duration-200"
-                                aria-label={`Remove ${item.productId?.name} from cart`}
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     <div className="mt-8 p-4 bg-gray-100 rounded-lg shadow-md">
                         <h2 className="text-2xl font-bold">Cart Summary</h2>
@@ -114,7 +168,7 @@ const Cart = () => {
                         <div className="mt-6 text-center">
                             <button
                                 className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
-                                onClick={() => alert("Proceeding to checkout...")}
+                                onClick={handleCheckout}
                             >
                                 Proceed to Checkout
                             </button>

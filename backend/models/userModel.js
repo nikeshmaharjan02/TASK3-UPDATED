@@ -10,7 +10,12 @@ const userSchema = new mongoose.Schema(
         role: { type: String, enum: ["user", "admin"], default: "user" },
         image: {type: String },
         googleId: { type: String },
+        loginAttempts: { type: Number, default: 0 },
+        lockUntil: { type: Date, default: null }
     });
+userSchema.methods.isLocked = function () {
+    return this.lockUntil && this.lockUntil > Date.now();
+};
 
 const userModel =
     mongoose.models.user || mongoose.model("user", userSchema);

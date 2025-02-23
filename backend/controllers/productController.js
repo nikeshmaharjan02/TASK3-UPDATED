@@ -6,7 +6,7 @@ const redisClient = require('../utils/redisClient');
 
 const getProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 10, min_price, max_price, sort, category, search } = req.query;
+        const { page = 1, limit = 10, min_price, max_price, sort, category, search, tags } = req.query;
 
         let filter = {}; 
 
@@ -24,6 +24,11 @@ const getProducts = async (req, res) => {
             filter.$text = { $search: search };
         }
 
+        if (tags) {
+            const tagsArray = tags.split(",").map(tag => tag.trim());
+            filter.tags = { $in: tagsArray }; // Search for products that have any of the provided tags
+        }
+
         let sortOption = { createdAt: -1 };
         if (sort === "oldest") sortOption = { createdAt: 1 };
         if (sort === "views") sortOption = { views: -1 };
@@ -36,7 +41,7 @@ const getProducts = async (req, res) => {
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        const cacheKey = `products:page=${page}&limit=${limit}&min_price=${min_price || ''}&max_price=${max_price || ''}&sort=${sort || ''}&category=${category || ''}&search=${search || ''}`;
+        const cacheKey = `products:page=${page}&limit=${limit}&min_price=${min_price || ''}&max_price=${max_price || ''}&sort=${sort || ''}&category=${category || ''}&search=${search || ''}&tags=${tags || ''}`;
 
         const cachedData = await redisClient.get(cacheKey);
         if (cachedData) {
@@ -74,10 +79,38 @@ const getProducts = async (req, res) => {
     }
 };
 
+const getProduct = async (req, res) => {
+    try {
+        const { id } = req.params; 
+
+        const product = await productModel.findById(id);
+        
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Product details fetched successfully",
+            data: product
+        });
+    } catch (error) {
+        logger.error(`Error fetching product: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: "Server Error",
+            error: error.message
+        });
+    }
+};
+
 const addProduct = async (req, res) => {
     try {
-        const { name, description, price, category } = req.body;
-        const imageFile = req.file;
+        const { name, description, price, category, tags } = req.body;
+        const imageFiles = req.files;
 
         if (!name || !price || !category) {
             return res.status(400).json({
@@ -86,13 +119,15 @@ const addProduct = async (req, res) => {
             });
         }
 
-        let imageUrl = "";
+        let imageUrls = [];
 
-        if (imageFile) {
+        if (imageFiles && imageFiles.length > 0) {
             try {
-                const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" });
-                imageUrl = imageUpload.secure_url;
-                fs.unlinkSync(imageFile.path);
+                for (let i=0; i< imageFiles.length; i++){
+                    const imageUpload = await cloudinary.uploader.upload(imageFiles[i].path, { resource_type: "image" });
+                    imageUrls.push(imageUpload.secure_url);
+                    fs.unlinkSync(imageFiles[i].path);
+                }
             } catch (uploadError) {
                 logger.error(`Image upload failed: ${uploadError.message}`);
                 return res.status(500).json({
@@ -108,13 +143,15 @@ const addProduct = async (req, res) => {
             description,
             price,
             category,
-            image: imageUrl,
+            tags: tags ? tags.split(",").map(tag => tag.trim()) : [],
+            images: imageUrls,
         });
 
         await newProduct.save();
 
-        const cacheKeyPattern = `products:page=*&limit=*&min_price=&max_price=&sort=&category=${category || ''}`;
-        await redisClient.del(cacheKeyPattern);
+        // const cacheKeyPattern = `products:page=*&limit=*&min_price=&max_price=&sort=&category=${category || ''}`;
+        // await redisClient.del(cacheKeyPattern);
+        await redisClient.flushall();
 
         logger.info(`New product added: ${name} (ID: ${newProduct._id})`);
 
@@ -134,4 +171,4 @@ const addProduct = async (req, res) => {
     }
 };
 
-module.exports = { getProducts, addProduct };
+module.exports = { getProducts, getProduct, addProduct };

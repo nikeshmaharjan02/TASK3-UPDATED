@@ -31,8 +31,6 @@ const AppContextProvider = (props) => {
 
     // Fetch cart only when userData is available
     const fetchCart = async () => {
-       
-
         if (!userData) {
             console.warn("Skipping fetchCart because userData is null");
             return;
@@ -40,10 +38,10 @@ const AppContextProvider = (props) => {
 
         try {
             const response = await axios.get(`${backendUrl}/api/cart`, { withCredentials: true });
-            
 
             if (response.data.success) {
                 setCart(response.data.cart.items);
+               
             } else {
                 console.error("Failed to fetch cart:", response.data.message);
             }
@@ -58,9 +56,14 @@ const AppContextProvider = (props) => {
 
     useEffect(() => {
         if (userData) {
-            fetchCart(); // Fetch cart only when userData updates
+            fetchCart();
         }
     }, [userData]);
+
+    // Log the cart whenever it changes
+    useEffect(() => {
+        // console.log("Cart updated:", cart);
+    }, [cart]);
 
     return (
         <AppContext.Provider value={{ backendUrl, userData, setUserData, cart, setCart, checkSession }}>

@@ -64,12 +64,30 @@ const loginUser = async (req,res) => {
         if(!user) {
             return res.json({success:false,message:"User doesnot exist"})
         }
+        // Check if user is locked out
+        if (user.isLocked()) {
+            return res.json({ success: false, message: "Account is locked. Please reset your password or try again later." });
+        }
 
         const isMatch = await bcrypt.compare(password,user.password)
 
         if(!isMatch) {
+            user.loginAttempts += 1;
+            // Lock account if max attempts reached
+            if (user.loginAttempts >= 5) {
+                user.lockUntil = Date.now() + 30 * 60 * 1000; // Lock for 30 minutes
+                await sendEmail(user.email, "Account Locked", "Your account has been locked due to too many failed login attempts. Please reset your password or try again later.");
+
+            }
+
+            await user.save();
             res.json({success:false,message:"Invalid Credentials!!"})
         } else {
+            // Reset login attempts on successful login
+            user.loginAttempts = 0;
+            user.lockUntil = null;
+            await user.save();
+
             // const token = jwt.sign({id: user._id, role: user.role },process.env.JWT_SECRET)
             // **Store user session**
             req.session.user = { id: user._id, name:user.name, role: user.role, email: user.email, };
@@ -156,6 +174,10 @@ const resetPassword = async (req,res)=> {
 
         const updatedUser = await userModel.findByIdAndUpdate(decoded.id,{password:hashedPassword}, { new: true }).select("-password");
 
+        // Reset loginAttempts and unlock the account
+        updatedUser.loginAttempts = 0;
+        updatedUser.lockUntil = null;
+        await updatedUser.save();
         
         res.json({success:true, message:"Reset Password Successfully"})
         
