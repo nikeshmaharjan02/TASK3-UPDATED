@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+@import "tailwindcss";
+*{
+    font-family: Outfit;
+}
+/* src/styles.css or src/index.css */
+:root {
+    --primary-color: #5F6FFF; /* Set the primary color here */
+}
+  
+.bg-primary {
+    background-color: var(--primary-color);
+}
+  
+.text-primary {
+    color: var(--primary-color);
+}

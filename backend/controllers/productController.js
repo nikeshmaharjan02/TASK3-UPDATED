@@ -1,4 +1,5 @@
 const productModel = require("../models/productModel");
+const searchHistoryModel = require("../models/searchHistoryModel")
 const logger = require("../utils/logger");
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
@@ -22,11 +23,12 @@ const getProducts = async (req, res) => {
 
         if (search) {
             filter.$text = { $search: search };
+            await searchHistoryModel.create({ searchTerm: search });
         }
 
         if (tags) {
             const tagsArray = tags.split(",").map(tag => tag.trim());
-            filter.tags = { $in: tagsArray }; // Search for products that have any of the provided tags
+            filter.tags = { $in: tagsArray }; 
         }
 
         let sortOption = { createdAt: -1 };
@@ -55,6 +57,12 @@ const getProducts = async (req, res) => {
             .sort(sortOption)
             .skip(skip)
             .limit(parseInt(limit));
+
+        
+        if (search && products.length > 0) {
+            const productIds = products.map(product => product._id);
+            await productModel.updateMany({ _id: { $in: productIds } }, { $inc: { popularity: 1 } });
+        }
 
         const total = await productModel.countDocuments(filter);
 
@@ -151,9 +159,9 @@ const addProduct = async (req, res) => {
 
         // const cacheKeyPattern = `products:page=*&limit=*&min_price=&max_price=&sort=&category=${category || ''}`;
         // await redisClient.del(cacheKeyPattern);
-        await redisClient.flushall();
+        await redisClient.FLUSHALL();
 
-        logger.info(`New product added: ${name} (ID: ${newProduct._id})`);
+        // logger.info(`New product added: ${name} (ID: ${newProduct._id})`);
 
         res.status(201).json({
             success: true,
@@ -162,7 +170,7 @@ const addProduct = async (req, res) => {
         });
 
     } catch (error) {
-        logger.error(`Error adding product: ${error.message}`);
+        console.log(`Error adding product: ${error.message}`);
         res.status(500).json({
             success: false,
             message: "Server Error",
